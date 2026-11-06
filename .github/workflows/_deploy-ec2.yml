@@ -1,0 +1,40 @@
+name: Deploy to EC2
+
+on:
+  workflow_call:
+    inputs:
+      environment: { required: true, type: string }
+      image: { required: true, type: string }
+
+env:
+  APP_NAME: cloud-devops-app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Deploy through Systems Manager
+        env:
+          IMAGE: ${{ inputs.image }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          REGION: ${{ vars.AWS_REGION }}
+        run: |
+          REGISTRY="${IMAGE%%/*}"; TAG="${IMAGE##*:}"
+          SCRIPT="export IMAGE='$IMAGE' REGISTRY='$REGISTRY' TAG='$TAG' REGION='$REGION' ENVIRONMENT='$ENVIRONMENT' APP='$APP_NAME'"$'\n'"$(cat scripts/deploy-ec2.sh)"
+          PARAMS=$(jq -n --arg s "$SCRIPT" '{commands: [$s]}')
+          CMD_ID=$(aws ssm send-command --document-name AWS-RunShellScript --comment "Deploy $TAG to $ENVIRONMENT" \
+            --targets "Key=tag:App,Values=$APP_NAME" "Key=tag:Env,Values=$ENVIRONMENT" \
+            --parameters "$PARAMS" --query Command.CommandId --output text)
+          sleep 5
+          IDS=$(aws ssm list-command-invocations --command-id "$CMD_ID" --query 'CommandInvocations[].InstanceId' --output text)
+          [ -n "$IDS" ] || { echo "No instances matched App=$APP_NAME, Env=$ENVIRONMENT"; exit 1; }
+          for ID in $IDS; do aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$ID"; done

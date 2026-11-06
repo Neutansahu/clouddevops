@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CloudDevOps: automated CI/CD for a containerized Node.js app</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#07122b;--navy2:#0b2455;--green:#1fcf94;--mint:#2ee6a6;--cyan:#19b5fe;--bg:#F4F7FF;--card:#fff;--ink:#0b1b3d;--muted:#56637f;--line:#dbe3f5;--ok:#118a5a;--warn:#9a6200;--bad:#c0392b;
+ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root{--bg:#0c1325;--card:#131c36;--ink:#e8edfb;--muted:#9aa7c7;--line:#243153;--ok:#3fd69a;--warn:#e5b04f;--bad:#f0877b}}
+html{scroll-behavior:smooth;scroll-padding-top:calc(76px + env(safe-area-inset-top,0px))}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 'Inter',system-ui,sans-serif}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--navy);z-index:30}
+a{color:inherit}button,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.wrap{width:min(1180px,100% - 48px);margin:0 auto}
+.code,.sha{font-family:'Fira Code',ui-monospace,monospace}.sha{font-size:13px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:var(--navy);border-bottom:1px solid #1a2a52;color:#fff}
+header .wrap{display:flex;align-items:center;justify-content:space-between;gap:20px;height:72px}
+.logo{display:flex;align-items:center;gap:8px;font-size:27px;font-weight:700;text-decoration:none;letter-spacing:-.01em}.logo span{color:var(--cyan)}
+header nav{display:flex;gap:26px}header nav a{text-decoration:none;font-size:15px;font-weight:500;color:#e6ecff}header nav a:hover{color:var(--mint)}
+.status{font-size:14px;color:#b9f5dc;white-space:nowrap}.status i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mint);margin-right:6px}
+
+.hero{background:linear-gradient(120deg,#07122b 0%,#0b2455 55%,#2b2a7c 100%);color:#fff;padding:80px 0 84px}
+.hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:56px;align-items:center}
+.pill{display:inline-flex;gap:10px;align-items:center;border:1px solid #3a63b8;border-radius:999px;padding:8px 18px;font-size:14px;background:rgba(255,255,255,.04)}
+.hero h1{font-size:clamp(34px,5vw,60px);line-height:1.12;margin:22px 0;font-weight:800;letter-spacing:-.02em}.hero h1 em{font-style:normal;color:var(--mint)}
+.hero p.lead{font-size:18px;color:#d3dcf5;max-width:620px;margin:0 0 30px}
+.btns{display:flex;gap:16px;flex-wrap:wrap}
+.btn{display:inline-block;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 14px;cursor:pointer;text-decoration:none;font-weight:500}
+.btn:hover:not([disabled]){border-color:var(--cyan)}.btn[disabled]{opacity:.45;cursor:default}.btn.sm{padding:4px 10px;font-size:13px}
+.btn.go{background:var(--green);border-color:var(--green);color:#052b1d;font-weight:700;padding:16px 26px;font-size:16px}
+.btn.ghost{background:transparent;border-color:#8fb0ee;color:#fff;font-weight:600;padding:15px 24px}
+.cloudcard{border:1px solid #2f58a8;border-radius:32px;padding:44px 40px;text-align:center;background:linear-gradient(160deg,rgba(21,58,130,.75),rgba(14,31,78,.75))}
+.cloudcard svg{width:110px;filter:drop-shadow(0 0 22px rgba(120,170,255,.55))}
+.cloudcard h2{font-size:30px;margin:14px 0 20px}
+.term{text-align:left;background:#050d22;border:2px solid #2d6fd8;border-radius:14px;padding:18px 22px;font:14.5px/1.9 'Fira Code',monospace;color:#7ff0cf}
+.term p{margin:0;opacity:0;animation:show .01s forwards}.term p:nth-child(1){animation-delay:.4s}.term p:nth-child(2){animation-delay:1.1s}.term p:nth-child(3){animation-delay:1.8s}.term p:nth-child(4){animation-delay:2.6s;color:#38e08f}
+@keyframes show{to{opacity:1}}
+.cloudcard small{display:block;margin-top:20px;font-size:17px;color:#dfe8ff}
+@media(prefers-reduced-motion:reduce){.term p{opacity:1;animation:none}.stg-running i{animation:none!important}html{scroll-behavior:auto}}
+
+section.band{padding:84px 0}section.alt{background:var(--card)}
+.head{text-align:center;max-width:720px;margin:0 auto 44px}.head h2{font-size:clamp(28px,3.4vw,38px);margin:0 0 10px;letter-spacing:-.01em}.head p{margin:0;color:var(--muted)}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+.steps li{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;position:relative}
+.steps .n{font-size:12px;color:var(--muted)}.steps b{display:block;margin:2px 0 6px}.steps code{display:block;font:12px/1.5 'Fira Code',monospace;color:var(--muted);word-break:break-word}
+.steps .st{position:absolute;top:16px;right:16px;font-size:13px;font-weight:700}
+.steps li.running{border-color:var(--cyan)}.steps li.done{border-color:color-mix(in srgb,var(--ok) 55%,var(--line))}.steps li.done .st{color:var(--ok)}.steps li.running .st{color:var(--cyan)}
+.runbar{display:flex;gap:14px;align-items:center;justify-content:center;margin:26px 0 14px}
+pre#plog{margin:0 auto;max-width:900px;min-height:96px;max-height:200px;overflow:auto;background:#050d22;color:#7ff0cf;border-radius:12px;padding:16px 20px;font:13.5px/1.8 'Fira Code',monospace}
+.grid{display:grid;gap:18px}.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}
+.tile{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--cyan);border-radius:12px;padding:20px}.tile h3{margin:0 0 6px;font-size:17px}.tile p{margin:0;color:var(--muted);font-size:15px}
+.feat{padding:6px 0 6px 18px;border-left:3px solid var(--green)}.feat h3{margin:0 0 4px;font-size:17px}.feat p{margin:0;color:var(--muted);font-size:15px}
+
+.tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 16px;cursor:pointer;color:var(--muted);font-weight:600}
+.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--green)}
+.split{display:grid;grid-template-columns:1fr 1fr;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:16px}
+.env{padding:22px;border-left:1px solid var(--line);display:grid;gap:10px;align-content:start}.env:first-child{border:0}
+.env h3{margin:0;font-size:19px;display:flex;gap:10px;align-items:center}.env .tag{font-size:22px}.env .meta{color:var(--muted);font-size:14px}.acts{display:flex;gap:8px;flex-wrap:wrap}
+.badge{font:700 12px/1 'Inter',sans-serif;padding:4px 9px;border-radius:999px;border:1px solid currentColor}
+.b-healthy,.b-success{color:var(--ok)}.b-deploying,.b-running{color:var(--cyan)}.b-warning,.b-queued{color:var(--warn)}.b-failed{color:var(--bad)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:16px}
+.kpi{padding:18px 22px;border-left:1px solid var(--line)}.kpi:first-child{border:0}.kpi .l{color:var(--muted);font-size:13px}.kpi .v{font-size:30px;font-weight:700;letter-spacing:-.02em}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}.panel h3{margin:0 0 12px;font-size:16px}
+.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}th{font-size:13px;color:var(--muted);white-space:nowrap}
+td small{display:block;color:var(--muted)}tr.click{cursor:pointer}tr.click:hover{background:color-mix(in srgb,var(--cyan) 7%,transparent)}
+.list{list-style:none;margin:0;padding:0}.list li{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}.list li:last-child{border:0}.list small{display:block;color:var(--muted)}
+.rail{display:flex;list-style:none;margin:0;padding:0;flex-wrap:wrap;row-gap:6px}
+.stg{position:relative;display:flex;align-items:center;gap:6px;padding:3px 10px 3px 8px;border:1px solid var(--line);border-radius:999px;font-size:12px;white-space:nowrap;background:var(--card)}
+.stg+.stg{margin-left:16px}.stg+.stg::before{content:'';position:absolute;left:-17px;top:50%;width:16px;border-top:2px solid var(--line)}
+.stg i{font-style:normal;font-weight:700;width:12px;text-align:center}.stg .sec{color:var(--muted)}
+.stg-success{color:var(--ok)}.stg-failed{color:var(--bad)}.stg-running{color:var(--cyan);border-color:var(--cyan)}.stg-queued{color:var(--warn)}.stg-skipped,.stg-cancelled{color:var(--muted)}
+.stg-running i{animation:pulse 1.2s ease-in-out infinite}@keyframes pulse{50%{opacity:.3}}
+.scan b{color:var(--bad)}
+
+.dark{background:linear-gradient(120deg,#07122b,#0b2455 60%,#25246f);color:#fff}.dark .head p{color:#c3cff0}
+.health{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.hbox{background:rgba(255,255,255,.06);border:1px solid #2f58a8;border-radius:16px;padding:24px}
+.big{font-size:28px;font-weight:700;color:var(--mint);margin:0 0 6px}
+pre.json{margin:14px 0;background:#050d22;color:#7ff0cf;border-radius:10px;padding:14px 16px;font:13.5px/1.7 'Fira Code',monospace;overflow:auto}
+.dark .list li{border-color:#27407c}.dark .list small{color:#aebbe0}
+.spark{display:grid;grid-template-columns:90px 1fr 64px;align-items:center;gap:10px;padding:6px 0}.spark svg{width:100%;height:34px}.spark b{text-align:right}
+footer{background:var(--navy);color:#9db0dd;padding:28px 0;text-align:center;font-size:14px}
+
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);padding:0;width:min(720px,94vw)}dialog::backdrop{background:rgba(5,10,25,.6)}
+.dlg{padding:22px;display:grid;gap:14px}.dlg h3{margin:0}.dlg .row{display:flex;gap:8px;justify-content:flex-end}
+pre.logs{margin:0;background:#050d22;color:#7ff0cf;border-radius:8px;padding:12px;max-height:300px;overflow:auto;font:12.5px/1.6 'Fira Code',monospace;white-space:pre-wrap}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:8px;z-index:60;max-width:90vw}
+
+@media(max-width:980px){.hero .wrap,.health{grid-template-columns:1fr}.steps{grid-template-columns:repeat(2,1fr)}.g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr}.split{grid-template-columns:1fr}.env{border-left:0;border-top:1px solid var(--line)}.env:first-child{border:0}.kpis{grid-template-columns:1fr 1fr}.kpi:nth-child(3){border-left:0}.kpi:nth-child(n+3){border-top:1px solid var(--line)}}
+@media(max-width:560px){.g4{grid-template-columns:1fr}.steps{grid-template-columns:1fr}.status{font-size:12px}.logo{font-size:22px}}
+.right{display:flex;align-items:center;gap:14px}
+.dd{position:relative}.dd .menu{display:none;position:absolute;top:100%;left:-12px;min-width:210px;background:var(--navy);border:1px solid #1a2a52;border-radius:10px;padding:8px;z-index:50}
+.dd:hover .menu,.dd:focus-within .menu{display:grid}.menu a{padding:8px 12px;border-radius:6px;white-space:nowrap}.menu a:hover{background:rgba(255,255,255,.08)}
+header nav a.navdash{color:var(--mint);font-weight:700}
+.loginbox{max-width:420px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px}
+.loginbox label{display:grid;gap:4px;font-weight:500}.loginbox input,.tools input,.tools select{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:9px 12px;font:inherit}
+.err{color:var(--bad);min-height:1.3em;margin:0}
+.tools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}.tools input{flex:1;min-width:200px}
+.pager{display:flex;justify-content:space-between;align-items:center;margin-top:14px;color:var(--muted)}.pager div{display:flex;gap:8px}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:980px){header .wrap{height:auto;flex-wrap:wrap;padding:10px 0;row-gap:8px}header nav{display:flex;order:3;width:100%;overflow-x:auto;gap:20px;padding-bottom:4px}.dd .menu{display:none!important}.mgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <a class="logo" href="#home"><svg width="30" height="22" viewBox="0 0 30 22" aria-hidden="true"><path fill="#fff" d="M7 21a6 6 0 0 1-.7-11.95A8 8 0 0 1 21.7 7.4 6.8 6.8 0 0 1 23 21z"/></svg>Cloud<span>DevOps</span></a>
+  <nav aria-label="Main"><a href="#home">Home</a><a href="#pipeline">Pipeline</a><a href="#technologies">Technologies</a><a href="#features">Features</a>
+    <div class="dd"><a href="#dashboard" class="navdash">Dashboard ▾</a><div class="menu">
+      <a href="#dashboard" data-tab="overview">Overview</a><a href="#dashboard" data-tab="runs">Pipeline runs</a><a href="#dashboard" data-tab="releases">Releases</a><a href="#dashboard" data-tab="infra">Infrastructure</a><a href="#dashboard" data-tab="activity">Activity log</a></div></div>
+    <a href="#health">Health Check</a></nav>
+  <div class="right"><span class="status" id="status"><i></i>Application Online · Port 8000</span><button class="btn go sm" id="authBtn" type="button">Sign in</button></div>
+</div></header>
+
+<section class="hero" id="home"><div class="wrap">
+  <div>
+    <span class="pill">⚙ Node.js <b>+</b> Docker <b>+</b> AWS</span>
+    <h1>Automated CI/CD Pipeline for a Containerized <em>Node.js</em> Web Application</h1>
+    <p class="lead">My Containerized Web Application demonstrates a modern DevOps workflow using GitHub Actions, Docker, Amazon ECR, AWS EC2, and Systems Manager. Deploy your application with automation and secure access.</p>
+    <div class="btns"><a class="btn go" href="#pipeline">🚀 Explore Pipeline</a><a class="btn ghost" href="#technologies">View Technologies →</a></div>
+  </div>
+  <div class="cloudcard">
+    <svg viewBox="0 0 120 80" aria-hidden="true"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#c9c4ff"/></linearGradient></defs><path fill="url(#cg)" d="M30 72a22 22 0 0 1-3-43.8A30 30 0 0 1 84 22a24 24 0 0 1 6 50z"/></svg>
+    <h2>Code to Cloud</h2>
+    <div class="term" aria-label="Pipeline output"><p>&gt; docker build .</p><p>&gt; pushing image to ECR</p><p>&gt; deploying to AWS EC2</p><p>✓ Ready for deployment</p></div>
+    <small>Build · Test · Deploy</small>
+  </div>
+</div></section>
+
+<section class="band" id="pipeline"><div class="wrap">
+  <div class="head"><h2>⚡ CI/CD Pipeline</h2><p>Every push to <span class="code">main</span> is tested, built into a Docker image, stored in Amazon ECR and deployed to EC2 through Systems Manager. Run a simulation below.</p></div>
+  <ol class="steps" id="steps"></ol>
+  <div class="runbar"><button class="btn go" id="runPipe" type="button">▶ Run pipeline</button></div>
+  <pre id="plog" aria-live="polite">Press “Run pipeline” to watch a deployment.</pre>
+</div></section>
+
+<section class="band alt" id="technologies"><div class="wrap">
+  <div class="head"><h2>Technologies</h2><p>Managed AWS services and open tools, wired together with short-lived credentials.</p></div>
+  <div class="grid g4">
+    <div class="tile"><h3>Node.js</h3><p>Express app with a <span class="code">/health</span> endpoint on port 8000.</p></div>
+    <div class="tile"><h3>Docker</h3><p>Multi-stage image that runs as a non-root user.</p></div>
+    <div class="tile"><h3>GitHub Actions</h3><p>Test, build and deploy on every push, with OIDC sign-in to AWS.</p></div>
+    <div class="tile"><h3>Amazon ECR</h3><p>Private registry with scan on push and tags set to the commit SHA.</p></div>
+    <div class="tile"><h3>Amazon EC2</h3><p>Docker host for staging and production, tagged by environment.</p></div>
+    <div class="tile"><h3>Systems Manager</h3><p>Run Command deploys and Session Manager shells, with no SSH port open.</p></div>
+    <div class="tile"><h3>IAM</h3><p>Separate build and deploy roles, scoped to this repository.</p></div>
+    <div class="tile"><h3>CloudWatch</h3><p>Container logs, CPU alarms and notifications through SNS.</p></div>
+  </div>
+</div></section>
+
+<section class="band" id="features"><div class="wrap">
+  <div class="head"><h2>Features</h2><p>What the pipeline gives you out of the box.</p></div>
+  <div class="grid g3">
+    <div class="feat"><h3>Automated tests</h3><p>A failing test stops the pipeline before anything is built.</p></div>
+    <div class="feat"><h3>Secure access</h3><p>No stored AWS keys and no SSH. GitHub signs in with OIDC and servers are reached through Systems Manager.</p></div>
+    <div class="feat"><h3>Staging first</h3><p>Production only accepts images that already ran on staging.</p></div>
+    <div class="feat"><h3>One-click rollback</h3><p>Return to the previous image in under two minutes.</p></div>
+    <div class="feat"><h3>Health-checked deploys</h3><p>A deploy only counts when <span class="code">/health</span> answers. Otherwise the old container comes back.</p></div>
+    <div class="feat"><h3>Image scanning</h3><p>Critical, high and medium findings show next to every image.</p></div>
+    <div class="feat"><h3>Audit trail</h3><p>Every sign-in, deploy and rollback is logged with who did it and when.</p></div>
+    <div class="feat"><h3>Secrets stay out of images</h3><p>Runtime secrets live on the server, never in GitHub or the Docker image.</p></div>
+    <div class="feat"><h3>One deploy at a time</h3><p>A lock per environment stops two releases from colliding.</p></div>
+  </div>
+</div></section>
+
+<section class="band alt" id="dashboard"><div class="wrap">
+  <div class="head"><h2>Deployment dashboard</h2><p>Track environments, runs and images, then deploy or roll back.<span id="demoNote"></span></p></div>
+  <div id="dashLogin" class="loginbox" hidden><form id="login" style="display:grid;gap:12px"><b style="font-size:18px">Sign in to the dashboard</b>
+    <label>Email<input id="email" type="email" autocomplete="username" required></label>
+    <label>Password<input id="pw" type="password" autocomplete="current-password" required></label>
+    <p class="err" id="err" role="alert"></p><button class="btn go" type="submit" style="padding:12px">Sign in</button></form></div>
+  <div id="dashApp" hidden>
+    <div class="tabs" role="tablist" id="tabs" style="overflow-x:auto">
+      <button role="tab" data-tab="overview" aria-selected="true">Overview</button><button role="tab" data-tab="runs" aria-selected="false">Pipeline runs</button>
+      <button role="tab" data-tab="releases" aria-selected="false">Releases</button><button role="tab" data-tab="infra" aria-selected="false">Infrastructure</button><button role="tab" data-tab="activity" aria-selected="false">Activity log</button>
+    </div>
+    <div id="tab-overview"><div class="split" id="envs"></div><div class="kpis" id="kpis"></div><div class="panel"><h3>Recent activity</h3><ul class="list" id="events"></ul></div></div>
+    <div id="tab-runs" hidden><div class="panel"><div class="tools"><input id="q" type="search" placeholder="Search by run, commit, message or author" aria-label="Search runs"><select id="statusFilter" aria-label="Filter by status"><option value="">All statuses</option><option>success</option><option>failed</option><option>running</option></select></div>
+      <div class="tablewrap"><table><thead><tr><th>Run</th><th>Change</th><th>Stages</th><th>Duration</th><th>Started</th></tr></thead><tbody id="rows"></tbody></table></div>
+      <div class="pager"><span id="pageinfo"></span><div><button class="btn sm" id="prev" type="button">Previous</button><button class="btn sm" id="next" type="button">Next</button></div></div></div></div>
+    <div id="tab-releases" hidden><div class="panel"><h3>Images in Amazon ECR</h3><div class="tablewrap"><table><thead><tr><th>Tag</th><th>Pushed</th><th>Size</th><th>Scan findings</th><th>Running on</th><th>Deploy</th></tr></thead><tbody id="images"></tbody></table></div>
+      <p style="color:var(--muted);margin:14px 0 0;font-size:14px">Production only accepts images that already ran on staging.</p></div></div>
+    <div id="tab-infra" hidden><div class="panel" style="margin-bottom:16px"><h3>AWS services</h3><ul class="list" id="services"></ul></div><div class="mgrid" id="metrics"></div></div>
+    <div id="tab-activity" hidden><div class="panel"><h3>Audit log</h3><ul class="list" id="evfull"></ul></div></div>
+  </div>
+</div></section>
+
+<section class="band dark" id="health"><div class="wrap">
+  <div class="head"><h2>Health Check</h2><p>The deployed app answers <span class="code">GET /health</span> on port 8000. The pipeline waits for it before a deploy counts as done.</p></div>
+  <div class="health">
+    <div class="hbox"><p class="big" id="hstate">Checking…</p><pre class="json" id="hjson">{}</pre><button class="btn go" id="recheck" type="button" style="padding:10px 20px">Run health check</button></div>
+    <div class="hbox"><h3 style="margin:0 0 10px">What happens on every deploy</h3><ul class="list">
+      <li><span><b>New container starts</b><small>Systems Manager pulls the image from ECR on the server.</small></span></li>
+      <li><span><b>/health must answer</b><small>The script retries for about a minute.</small></span></li>
+      <li><span><b>A failure restores the old container</b><small>The previous image keeps serving traffic.</small></span></li>
+      <li><span><b>Success is recorded</b><small>New and previous tags are saved in Parameter Store for rollback.</small></span></li></ul></div>
+  </div>
+</div></section>
+<footer><div class="wrap">CloudDevOps · Node.js, Docker and AWS · GitHub Actions deploys on every push to main</div></footer>
+
+<dialog id="runDlg"><div class="dlg" id="runBody"></div></dialog>
+<dialog id="confirmDlg"><div class="dlg"><h3 id="cTitle"></h3><p id="cText" style="margin:0;color:var(--muted)"></p>
+  <div class="row"><button class="btn" id="cNo" type="button">Cancel</button><button class="btn go" id="cYes" type="button" style="padding:8px 16px">Confirm</button></div></div></dialog>
+<div id="toast" role="status" hidden></div>
+
+<script>
+const DEMO = false; let token = null;
+try { token = sessionStorage.getItem('t'); } catch {}
+const store = (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch {} };
+async function api(url, opt = {}) {
+  const r = await fetch(url, { ...opt, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...opt.headers } });
+  if (r.status === 401) { logout(); throw new Error('Session expired. Sign in again.'); }
+  const d = await r.json().catch(() => null);
+  if (!r.ok) throw new Error((d && d.error) || 'Request failed');
+  return d;
+}
+async function login(email, password) {
+  const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'Sign in failed');
+  return d;
+}
+const healthFetch = async () => (await fetch('/health')).json();
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ago = (iso) => { const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + ' min ago' : s < 86400 ? Math.floor(s / 3600) + ' h ago' : Math.floor(s / 86400) + ' d ago'; };
+const dur = (s) => s == null ? 'n/a' : s < 60 ? s + 's' : Math.floor(s / 60) + 'm ' + String(s % 60).padStart(2, '0') + 's';
+const toast = (m) => { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), 3800); };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const G = { success: '✓', failed: '✕', running: '●', queued: '○', skipped: '–', cancelled: '–' };
+const rail = (st) => `<ol class="rail">${st.map((s) => `<li class="stg stg-${s.status}"><i aria-hidden="true">${G[s.status]}</i>${esc(s.name)}${s.sec ? ` <span class="sec">${dur(s.sec)}</span>` : ''}<span class="sr">${s.status}</span></li>`).join('')}</ol>`;
+const T0 = Date.now();
+
+/* ---- pipeline simulation ---- */
+const STEPS = [['Push to GitHub', 'git push origin main', 1.2], ['Test', 'npm ci && npm test', 3.8], ['Build image', 'docker build -t cloud-devops-app .', 5.1],
+  ['Push to ECR', 'docker push <account>.dkr.ecr.ap-south-1.amazonaws.com/app', 3.2], ['Deploy via SSM', 'aws ssm send-command --document-name AWS-RunShellScript', 4.6], ['Health check', 'curl localhost:8000/health', 1.4]];
+$('#steps').innerHTML = STEPS.map(([n, c], i) => `<li><span class="n">Step ${i + 1}</span><span class="st"></span><b>${n}</b><code>${esc(c)}</code></li>`).join('');
+$('#runPipe').onclick = async (e) => {
+  const btn = e.currentTarget, log = $('#plog'), lis = [...document.querySelectorAll('#steps li')];
+  btn.disabled = true; log.textContent = ''; lis.forEach((l) => { l.className = ''; l.querySelector('.st').textContent = ''; });
+  for (let i = 0; i < STEPS.length; i++) {
+    lis[i].className = 'running'; lis[i].querySelector('.st').textContent = 'Running';
+    log.textContent += `> ${STEPS[i][1]}\n`; log.scrollTop = log.scrollHeight; await sleep(750);
+    lis[i].className = 'done'; lis[i].querySelector('.st').textContent = '✓ ' + STEPS[i][2] + 's';
+    log.textContent += `✓ ${STEPS[i][0]} complete\n`; log.scrollTop = log.scrollHeight;
+  }
+  log.textContent += '✓ Live on port 8000\n'; btn.disabled = false;
+};
+
+/* ---- tabs ---- */
+const TABS = ['overview', 'runs', 'releases', 'infra', 'activity'];
+function setTab(n) {
+  document.querySelectorAll('#tabs button').forEach((x) => x.setAttribute('aria-selected', x.dataset.tab === n));
+  TABS.forEach((x) => ($('#tab-' + x).hidden = x !== n));
+}
+document.addEventListener('click', (e) => { const a = e.target.closest('[data-tab]'); if (a) setTab(a.dataset.tab); });
+
+/* ---- auth ---- */
+function showAuth() {
+  const on = !!token;
+  $('#dashLogin').hidden = on; $('#dashApp').hidden = !on;
+  $('#authBtn').textContent = on ? 'Sign out' : 'Sign in'; $('#authBtn').hidden = DEMO;
+}
+function logout() { token = null; store('t', null); showAuth(); }
+$('#authBtn').onclick = () => { if (token) logout(); else location.hash = '#dashboard'; };
+$('#login').addEventListener('submit', async (e) => {
+  e.preventDefault(); $('#err').textContent = '';
+  try { const d = await login($('#email').value, $('#pw').value); token = d.token; store('t', token); showAuth(); loadDash(); }
+  catch (err) { $('#err').textContent = err.message; }
+});
+
+/* ---- dashboard ---- */
+const rs = { q: '', status: '', page: 1 };
+let debounce;
+$('#q').addEventListener('input', (e) => { clearTimeout(debounce); debounce = setTimeout(() => { rs.q = e.target.value; rs.page = 1; loadDash(); }, 250); });
+$('#statusFilter').onchange = (e) => { rs.status = e.target.value; rs.page = 1; loadDash(); };
+$('#prev').onclick = () => { rs.page--; loadDash(); };
+$('#next').onclick = () => { rs.page++; loadDash(); };
+const runRow = (r) => `<tr class="click" data-run="${r.id}"><td><b>#${r.number}</b></td><td>${esc(r.message)}<small><span class="sha">${esc(r.sha)}</span> by ${esc(r.actor)} on ${esc(r.branch)}</small></td><td>${rail(r.stages)}</td><td>${dur(r.durationSec)}</td><td>${ago(r.startedAt)}</td></tr>`;
+const evRow = (e) => `<li><span><b>${esc(e.actor)}</b> ${esc(e.detail)}</span><small>${ago(e.at)}</small></li>`;
+const spark = (v, mx) => `<svg viewBox="0 0 200 34" preserveAspectRatio="none" aria-hidden="true"><path d="${v.map((y, i) => (i ? 'L' : 'M') + (i * 200 / (v.length - 1)).toFixed(1) + ' ' + (31 - y / mx * 28).toFixed(1)).join('')}" fill="none" stroke="#19b5fe" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+
+async function loadDash() {
+  if (!token) return;
+  try {
+    const [o, r, im, ev, inf] = await Promise.all([api('/api/overview'), api('/api/runs?' + new URLSearchParams(rs)), api('/api/images'), api('/api/activity'), api('/api/infra')]), k = o.kpis;
+    $('#envs').innerHTML = Object.values(o.envs).map((e) => `<div class="env"><h3>${e.name[0].toUpperCase() + e.name.slice(1)} <span class="badge b-${e.status}">${e.status}</span></h3>
+      <div class="tag code">${esc(e.tag)}</div><div class="meta">${e.running} of ${e.desired} instance${e.desired === 1 ? '' : 's'} running, deployed ${e.deployedAt ? ago(e.deployedAt) : 'at an unknown time'}${e.url ? '<br>' + esc(e.url.replace('https://', '')) : ''}</div>
+      <div class="acts"><button class="btn sm" data-act="pick">Choose image</button><button class="btn sm" data-act="rollback" data-env="${e.name}" data-tag="${esc(e.previousTag || '')}" ${!e.previousTag || e.status === 'deploying' ? 'disabled' : ''}>Roll back${e.previousTag ? ' to ' + esc(e.previousTag) : ''}</button></div></div>`).join('');
+    $('#kpis').innerHTML = [['Production deploys', k.deploys], ['Success rate', k.successRate == null ? 'n/a' : k.successRate + '%'], ['Median pipeline time', dur(k.medianSec)], ['Failed runs', k.failed]].map(([l, v]) => `<div class="kpi"><div class="l">${l}, 14 days</div><div class="v">${v}</div></div>`).join('');
+    $('#events').innerHTML = ev.events.slice(0, 5).map(evRow).join(''); $('#evfull').innerHTML = ev.events.map(evRow).join('');
+    rs.page = r.page;
+    $('#rows').innerHTML = r.rows.length ? r.rows.map(runRow).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:28px">No runs match. Clear the search or choose another status.</td></tr>';
+    $('#pageinfo').textContent = `Page ${r.page} of ${r.pages}, ${r.total} runs`; $('#prev').disabled = r.page <= 1; $('#next').disabled = r.page >= r.pages;
+    $('#images').innerHTML = im.images.map((i) => {
+      const on = ['staging', 'production'].filter((n) => i.deployedTo[n]).map((n) => `<span class="badge b-healthy">${n}</span>`).join(' ') || '<small>Not deployed</small>';
+      return `<tr><td><span class="sha">${esc(i.tag)}</span>${i.message ? `<small>${esc(i.message)}</small>` : ''}</td><td>${ago(i.pushedAt)}</td><td>${i.sizeMb} MB</td><td class="scan">${i.scan.critical ? `<b>${i.scan.critical} critical</b>, ` : ''}${i.scan.high} high, ${i.scan.medium} medium</td><td>${on}</td>
+        <td><button class="btn sm" data-act="deploy" data-env="staging" data-tag="${esc(i.tag)}">Staging</button> <button class="btn sm" data-act="deploy" data-env="production" data-tag="${esc(i.tag)}" ${i.deployedTo.staging ? '' : 'disabled title="Deploy to staging first"'}>Production</button></td></tr>`;
+    }).join('');
+    $('#services').innerHTML = inf.services.map((s) => `<li><span><b>${esc(s.name)}</b><small>${esc(s.detail)}</small></span><span class="badge b-${s.status}">${s.status}</span></li>`).join('');
+    $('#metrics').innerHTML = inf.metrics ? Object.entries(inf.metrics).map(([env, m]) => `<div class="panel"><h3>${env[0].toUpperCase() + env.slice(1)}, last 30 minutes</h3>${[['CPU', m.cpu, 100, '%'], ['Memory', m.mem, 100, '%'], ['p95 latency', m.p95, 300, ' ms']].map(([l, v, mx, u]) => `<div class="spark"><span>${l}</span>${spark(v, mx)}<b>${v[v.length - 1]}${u}</b></div>`).join('')}</div>`).join('')
+      : '<div class="panel"><p style="margin:0;color:var(--muted)">Trend charts need CloudWatch metrics, which are not connected yet.</p></div>';
+  } catch (err) { if (token) toast(err.message); }
+}
+document.addEventListener('click', async (e) => {
+  const tr = e.target.closest('tr[data-run]');
+  if (tr) {
+    const { run, logs } = await api('/api/runs/' + tr.dataset.run);
+    $('#runBody').innerHTML = `<h3>Run #${run.number}: ${esc(run.message)}</h3><div style="color:var(--muted)"><span class="sha">${esc(run.sha)}</span> by ${esc(run.actor)}, ${esc(run.event)}, ${dur(run.durationSec)}</div>${rail(run.stages)}${logs ? `<pre class="logs">${esc(logs.join('\n'))}</pre>` : `<p>Logs live in GitHub. <a href="${esc(run.url)}" target="_blank" rel="noopener">Open run #${run.number}</a></p>`}<div class="row"><button class="btn" onclick="this.closest('dialog').close()">Close</button></div>`;
+    $('#runDlg').showModal(); return;
+  }
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  if (b.dataset.act === 'pick') { setTab('releases'); return; }
+  const kind = b.dataset.act === 'rollback' ? 'rollback' : 'deploy', env = b.dataset.env, tag = b.dataset.tag;
+  $('#cTitle').textContent = `${kind === 'rollback' ? 'Roll back' : 'Deploy'} ${tag} to ${env}?`;
+  $('#cText').textContent = DEMO ? 'In the real app this starts the deploy workflow in GitHub Actions. Here it runs on sample data.' : 'This starts the Manual deploy workflow in GitHub Actions. Follow progress on the Pipeline runs tab.';
+  $('#confirmDlg').showModal();
+  const ok = await new Promise((res) => { $('#cYes').onclick = () => { $('#confirmDlg').close(); res(true); }; $('#cNo').onclick = () => { $('#confirmDlg').close(); res(false); }; });
+  if (!ok) return;
+  try { toast((await api('/api/deploy', { method: 'POST', body: JSON.stringify({ environment: env, tag, kind }) })).message); loadDash(); } catch (err) { toast(err.message); }
+});
+
+/* ---- health ---- */
+async function check() {
+  const t0 = performance.now();
+  try {
+    const h = await healthFetch(), ms = Math.max(1, Math.round(performance.now() - t0));
+    $('#hstate').textContent = '● Healthy'; $('#hjson').textContent = JSON.stringify({ ...h, responseMs: ms }, null, 2);
+    $('#status').innerHTML = '<i></i>Application Online · Port ' + (h.port || 8000);
+  } catch { $('#hstate').textContent = '● Unreachable'; $('#status').textContent = 'Application Offline'; }
+}
+$('#recheck').onclick = check;
+if (DEMO) $('#demoNote').textContent = ' This page uses sample data, so nothing real changes.';
+showAuth(); loadDash(); check(); setInterval(loadDash, 8000); setInterval(check, 15000);
+</script>
+</body>
+</html>

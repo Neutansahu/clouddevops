@@ -1,0 +1,46 @@
+# Started by the Shipyard dashboard (Deploy and Roll back buttons) or by hand from the Actions tab.
+name: Manual deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [staging, production]
+      image_tag:
+        description: Image tag (short commit SHA) already in ECR
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.i.outputs.image }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_BUILD_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - id: i
+        env:
+          TAG: ${{ inputs.image_tag }}
+          REPO: ${{ vars.ECR_REPOSITORY }}
+          REGION: ${{ vars.AWS_REGION }}
+        run: |
+          aws ecr describe-images --repository-name "$REPO" --image-ids imageTag="$TAG" > /dev/null
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          echo "image=${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${REPO}:${TAG}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: prepare
+    uses: ./.github/workflows/_deploy-ec2.yml
+    with:
+      environment: ${{ inputs.environment }}
+      image: ${{ needs.prepare.outputs.image }}
