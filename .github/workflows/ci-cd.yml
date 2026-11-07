@@ -1,0 +1,91 @@
+name: ci-cd
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show OIDC claims (debug, remove later)
+        run: |
+          echo "Role ARN set? -> ${{ vars.AWS_BUILD_ROLE_ARN != '' }}"
+          TOKEN=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | python3 -c "import sys,json;print(json.load(sys.stdin)['value'])")
+          python3 - "$TOKEN" <<'EOF'
+          import sys, base64, json
+          p = sys.argv[1].split('.')[1]
+          p += '=' * (-len(p) % 4)
+          c = json.loads(base64.urlsafe_b64decode(p))
+          for k in ('sub', 'repository', 'ref', 'event_name', 'environment'):
+              print(k, '=', c.get(k))
+          EOF
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_BUILD_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - run: aws sts get-caller-identity
+
+  deploy-staging:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging          # must match the trust policy exactly
+    steps:
+      - name: Show OIDC claims (debug, remove later)
+        run: |
+          echo "Role ARN set? -> ${{ vars.AWS_DEPLOY_ROLE_ARN != '' }}"
+          TOKEN=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | python3 -c "import sys,json;print(json.load(sys.stdin)['value'])")
+          python3 - "$TOKEN" <<'EOF'
+          import sys, base64, json
+          p = sys.argv[1].split('.')[1]
+          p += '=' * (-len(p) % 4)
+          c = json.loads(base64.urlsafe_b64decode(p))
+          for k in ('sub', 'repository', 'ref', 'event_name', 'environment'):
+              print(k, '=', c.get(k))
+          EOF
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - run: aws sts get-caller-identity
+
+  deploy-production:
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production       # must match the trust policy exactly
+    steps:
+      - name: Show OIDC claims (debug, remove later)
+        run: |
+          echo "Role ARN set? -> ${{ vars.AWS_DEPLOY_ROLE_ARN != '' }}"
+          TOKEN=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | python3 -c "import sys,json;print(json.load(sys.stdin)['value'])")
+          python3 - "$TOKEN" <<'EOF'
+          import sys, base64, json
+          p = sys.argv[1].split('.')[1]
+          p += '=' * (-len(p) % 4)
+          c = json.loads(base64.urlsafe_b64decode(p))
+          for k in ('sub', 'repository', 'ref', 'event_name', 'environment'):
+              print(k, '=', c.get(k))
+          EOF
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - run: aws sts get-caller-identity
